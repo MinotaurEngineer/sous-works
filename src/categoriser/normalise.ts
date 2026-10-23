@@ -1,7 +1,13 @@
-import type { Category } from "../domain/categories.js";
+import { FALLBACK_CATEGORY, isCategory, type Category } from "../domain/categories.js";
 
-// TODO: implement. Contract: one Category per label; unknown labels become FALLBACK_CATEGORY;
-// throws if the label count differs from the expected count.
-export const normaliseCategories = (_labels: unknown[], _expected: number): Category[] => {
-  throw new Error("normaliseCategories not implemented");
+/**
+ * Turns raw model labels into Categories.
+ * A label that is not one of the 10 categories becomes FALLBACK_CATEGORY.
+ * A wrong number of labels throws: labels could no longer be matched to transactions.
+ */
+export const normaliseCategories = (labels: unknown[], expected: number): Category[] => {
+  if (labels.length !== expected) {
+    throw new Error(`Expected ${expected} labels, got ${labels.length}`);
+  }
+  return labels.map((label) => (isCategory(label) ? label : FALLBACK_CATEGORY));
 };
