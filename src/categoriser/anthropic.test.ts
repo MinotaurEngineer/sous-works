@@ -45,12 +45,15 @@ describe("createAnthropicCategoriser: algorithm", () => {
     expect(await make().categorise(rows)).toEqual(["Transportation", "Groceries", "Transportation", "Housing"]);
   });
 
-  it("sends the system prompt with the categories, and never puts descriptions in it", async () => {
-    await make().categorise([input("Albert Heijn Purchase")]);
-    const [system, user] = complete.mock.calls[0]!;
-    expect(system).toContain("Groceries");
-    expect(system).not.toContain("Albert Heijn Purchase");
-    expect(user).toContain("Albert Heijn Purchase");
+  it("sends a static system prompt listing the categories; descriptions go only in the user message", async () => {
+    await make().categorise([input("Zzz Unique Merchant One")]);
+    await make().categorise([input("Zzz Unique Merchant Two")]);
+    const [[system1, user1], [system2, user2]] = complete.mock.calls as [[string, string], [string, string]];
+    expect(system1).toContain("Groceries");
+    expect(system1).toBe(system2);
+    expect(system1).not.toContain("Zzz Unique Merchant");
+    expect(user1).toContain("Zzz Unique Merchant One");
+    expect(user2).toContain("Zzz Unique Merchant Two");
   });
 
   it("judges by description only: amount and type do not change the call", async () => {

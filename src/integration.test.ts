@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
+import { createAnthropicCategoriser, type Complete } from "./categoriser/anthropic.js";
 import type { Categoriser } from "./categoriser/categoriser.js";
 import { openDatabase } from "./db/open.js";
 import { createSqliteRepository } from "./repository/sqlite.js";
@@ -74,5 +75,39 @@ describe("CSV intake, end to end", () => {
     });
     expect(res.status).toBe(400);
     expect(await (await app.request("/transactions")).json()).toEqual([]);
+  });
+});
+
+describe("CSV intake with the real categoriser (model faked)", () => {
+  it("imports 1000 rows with one model call carrying only the 20 distinct descriptions", async () => {
+    const complete = vi.fn<Complete>(async (_system, user) => {
+      const descriptions: string[] = JSON.parse(user.split("\n")[1]!);
+      return JSON.stringify(descriptions.map((d) => (/Albert Heijn|AH /.test(d) ? "Groceries" : "Miscellaneous")));
+    });
+    const realApp = createApp({
+      categoriser: createAnthropicCategoriser({ complete }),
+      repository: createSqliteRepository(openDatabase(":memory:")),
+    });
+
+    const res = await importSample(realApp);
+
+    expect(res.status).toBe(201);
+    expect(complete).toHaveBeenCalledOnce();
+    const sent: string[] = JSON.parse(complete.mock.calls[0]![1].split("\n")[1]!);
+    expect(sent).toHaveLength(20);
+    expect(new Set(sent).size).toBe(20);
+
+    const list = (await (await realApp.request("/transactions")).json()) as Array<{ description: string; category: string }>;
+    expect(list).toHaveLength(1000);
+    expect(list.filter((t) => t.category === "Groceries").every((t) => /Albert Heijn|AH /.test(t.description))).toBe(true);
+  });
+
+  it("returns 502 and stores nothing when the model reply is unusable twice", async () => {
+    const realApp = createApp({
+      categoriser: createAnthropicCategoriser({ complete: async () => "sorry, no", warn: () => {} }),
+      repository: createSqliteRepository(openDatabase(":memory:")),
+    });
+    expect((await importSample(realApp)).status).toBe(502);
+    expect(await (await realApp.request("/transactions")).json()).toEqual([]);
   });
 });

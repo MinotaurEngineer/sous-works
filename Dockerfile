@@ -12,6 +12,7 @@ ENV NODE_ENV=production DATABASE_PATH=/data/app.db
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+COPY prompts ./prompts
 COPY src/db/schema.sql ./dist/db/schema.sql
 RUN mkdir /data && chown node:node /data
 USER node
