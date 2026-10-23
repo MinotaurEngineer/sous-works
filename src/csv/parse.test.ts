@@ -18,10 +18,20 @@ describe("parseTransactionsCsv: the provided file", () => {
     expect(new Set(rows().map((r) => r.id)).size).toBe(1000);
   });
 
+  it("converts every amount to the exact integer number of cents written in the file", () => {
+    const texts = realCsv.trim().split("\n").slice(1).map((line) => line.split(",")[1]!);
+    expect(rows()).toHaveLength(texts.length);
+    rows().forEach((r, i) => {
+      expect(Number.isInteger(r.amount)).toBe(true);
+      // Math.round(float * 100) is a safe oracle for the 1-2 decimal amounts in this file.
+      expect(r.amount).toBe(Math.round(Number(texts[i]) * 100));
+    });
+  });
+
   it("maps the first row to the TransactionInput shape", () => {
     expect(rows()[0]).toEqual({
       id: "TXN00001",
-      amount: -87.18,
+      amount: -8718,
       timestamp: new Date("2024-05-16T07:22:18.808Z"),
       description: "Municipal Tax Payment",
       type: "debit",
@@ -93,6 +103,8 @@ describe("parseTransactionsCsv: errors", () => {
     ["empty amount", { amount: "" }],
     ["non-numeric amount", { amount: "12,5" }],
     ["exponent amount", { amount: "1e3" }],
+    ["amount needing rounding (3 decimals)", { amount: "1.234" }],
+    ["amount beyond a safe integer of cents", { amount: "90071992547409.92" }],
     ["unparseable timestamp", { timestamp: "yesterday" }],
     ["impossible date", { timestamp: "2024-02-30 00:00:00" }],
     ["timestamp with date only", { timestamp: "2024-01-01" }],
@@ -121,6 +133,18 @@ describe("parseTransactionsCsv: tolerated variations", () => {
     expect(r?.timestamp.toISOString()).toBe("2024-01-01T10:20:30.000Z");
   });
 
+  it.each([["170.7", 17070], ["-309.34", -30934], ["1.15", 115], ["100", 10000], ["-0", 0]])(
+    "reads amount %s as %i cents",
+    (amount, cents) => {
+      expect(parseTransactionsCsv(`${HEADER}\n${row("A", { amount })}\n`)[0]?.amount).toBe(cents);
+    },
+  );
+
+  it("says what an invalid amount should look like", () => {
+    const [issue] = issuesOf(`${HEADER}\n${row("A", { amount: "1.234" })}\n`);
+    expect(issue?.message).toMatch(/at most 2 decimal/i);
+  });
+
   it("keeps a quoted description containing a comma", () => {
     const [r] = parseTransactionsCsv(`${HEADER}\n${row("A", { description: '"Bol.com, Utrecht"' })}\n`);
     expect(r?.description).toBe("Bol.com, Utrecht");
@@ -136,7 +160,7 @@ describe("parseTransactionsCsv: tolerated variations", () => {
     expect(parseTransactionsCsv(csv)).toEqual([
       {
         id: "A",
-        amount: 10,
+        amount: 1000,
         timestamp: new Date("2024-01-01T00:00:00.000Z"),
         description: "Salary",
         type: "credit",

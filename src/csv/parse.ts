@@ -1,4 +1,5 @@
 import { CsvError, parse } from "csv-parse/sync";
+import { parseDecimalToCents } from "../domain/money.js";
 import { parseTimestamp } from "../domain/timestamp.js";
 import { TransactionInput } from "../domain/transaction.js";
 
@@ -22,8 +23,6 @@ const COLUMNS = {
 } as const;
 
 type Field = keyof typeof COLUMNS;
-
-const AMOUNT = /^-?\d+(\.\d+)?$/;
 
 type CsvRecord = { fields: string[]; row: number };
 
@@ -76,8 +75,9 @@ export const parseTransactionsCsv = (csv: string): TransactionInput[] => {
     }
     const get = (field: Field) => fields[column.get(field)!]!;
 
-    if (!AMOUNT.test(get("amount"))) {
-      fail(`Amount must be a decimal number, got "${get("amount")}"`);
+    const amount = parseDecimalToCents(get("amount"));
+    if (amount === undefined) {
+      fail(`Amount must be a decimal with at most 2 decimal places (e.g. -87.18), got "${get("amount")}"`);
       continue;
     }
     const timestamp = parseTimestamp(get("timestamp"));
@@ -87,7 +87,7 @@ export const parseTransactionsCsv = (csv: string): TransactionInput[] => {
     }
     const parsed = TransactionInput.safeParse({
       id: get("id"),
-      amount: Number(get("amount")),
+      amount,
       timestamp,
       description: get("description"),
       type: get("type"),

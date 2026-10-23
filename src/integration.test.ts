@@ -33,13 +33,21 @@ describe("CSV intake, end to end", () => {
     expect(new Set(list.map((t) => t.id)).size).toBe(1000);
   });
 
+  it("stores every amount as an integer number of cents; the total equals the file's exact total", async () => {
+    await importSample(app);
+    const list = (await (await app.request("/transactions")).json()) as Array<{ amount: number }>;
+    expect(list.every((t) => Number.isInteger(t.amount))).toBe(true);
+    const expected = sampleCsv.trim().split("\n").slice(1).reduce((sum, line) => sum + Math.round(Number(line.split(",")[1]) * 100), 0);
+    expect(list.reduce((sum, t) => sum + t.amount, 0)).toBe(expected);
+  });
+
   it("stores row 1 of the file as the API shape, timestamp in UTC, with its category", async () => {
     await importSample(app);
     const res = await app.request("/transactions/TXN00001");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       id: "TXN00001",
-      amount: -87.18,
+      amount: -8718,
       timestamp: "2024-05-16T07:22:18.808Z",
       description: "Municipal Tax Payment",
       type: "debit",
