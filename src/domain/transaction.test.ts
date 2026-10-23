@@ -38,6 +38,15 @@ describe("TransactionInput", () => {
     expect(TransactionInput.safeParse({ ...valid, ...override }).success).toBe(false);
   });
 
+  it.each([["missing", undefined], ["unparseable", "not a date"], ["empty", ""]])(
+    "a %s timestamp gets a message that names the field and the expected format",
+    (_name, timestamp) => {
+      const result = TransactionInput.safeParse({ ...valid, timestamp });
+      const messages = result.error?.issues.filter((i) => i.path[0] === "timestamp").map((i) => i.message);
+      expect(messages).toEqual(["timestamp must be an ISO 8601 date-time"]);
+    },
+  );
+
   // data/transaction_history.csv: 494 of 1000 rows have a sign that disagrees with the type
   // (e.g. "Rent Payment", credit, -40.28). Rejecting them would drop half the file.
   it.each([

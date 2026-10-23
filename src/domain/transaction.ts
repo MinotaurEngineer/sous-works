@@ -5,7 +5,7 @@ import type { Category } from "./categories.js";
 export const TransactionInput = z.object({
   id: z.string().min(1),
   amount: z.number().finite(),
-  timestamp: z.coerce.date(),
+  timestamp: z.coerce.date({ error: "timestamp must be an ISO 8601 date-time" }),
   description: z.string().min(1),
   type: z.enum(["debit", "credit"]),
   accountNumber: z.string().min(1),

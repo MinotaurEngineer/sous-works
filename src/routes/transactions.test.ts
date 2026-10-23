@@ -110,6 +110,15 @@ describe("POST /transactions: input handling", () => {
     expect(json.issues.map((i) => i.path).sort()).toEqual(["amount", "type"]);
   });
 
+  it("explains a missing timestamp instead of a type-system message", async () => {
+    const { timestamp: _omitted, ...withoutTimestamp } = body;
+    const res = await post(app, withoutTimestamp);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      issues: [{ path: "timestamp", message: "timestamp must be an ISO 8601 date-time" }],
+    });
+  });
+
   it("ignores a client-supplied category: only the categoriser decides", async () => {
     const res = await post(app, { ...body, category: "Housing" });
     expect(res.status).toBe(201);
