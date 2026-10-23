@@ -2,10 +2,14 @@ import { z } from "zod";
 import type { Category } from "./categories.js";
 import { parseTimestamp } from "./timestamp.js";
 
+const AMOUNT_ERROR = "amount must be an integer number of cents (EUR minor units)";
+
 /** Input contract for POST /transactions and for each CSV row. */
 export const TransactionInput = z.object({
   id: z.string().min(1),
-  amount: z.number().finite(),
+  amount: z
+    .number({ error: AMOUNT_ERROR })
+    .int({ error: AMOUNT_ERROR }),
   timestamp: z.preprocess(
     (value) => (typeof value === "string" ? parseTimestamp(value) : value),
     z.date({ error: "timestamp must be an ISO 8601 date-time" }),

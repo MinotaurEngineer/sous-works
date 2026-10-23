@@ -29,10 +29,10 @@ curl localhost:3000/transactions/TXN00001
 
 curl -X POST localhost:3000/transactions \
   -H 'Content-Type: application/json' \
-  -d '{"id":"TXN90001","amount":-12.5,"timestamp":"2024-05-16T07:22:18Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686"}'
+  -d '{"id":"TXN90001","amount":-1250,"timestamp":"2024-05-16T07:22:18Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686"}'
 ```
 
-Importing the same file twice returns 409 (no upsert). Full request and response details: [docs/api.md](docs/api.md).
+`amount` is an integer number of **cents** (EUR), like Stripe: `-1250` is -12.50. The CSV file holds decimals (`-12.50`) and the import converts them exactly. Importing the same file twice returns 409 (no upsert). Full request and response details: [docs/api.md](docs/api.md).
 
 ## Configuration
 

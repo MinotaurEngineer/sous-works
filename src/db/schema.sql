@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS transactions (
   id             TEXT PRIMARY KEY,
-  amount         REAL NOT NULL,
+  amount         INTEGER NOT NULL, -- cents (EUR minor units)
   timestamp      TEXT NOT NULL, -- ISO 8601, UTC
   description    TEXT NOT NULL,
   type           TEXT NOT NULL CHECK (type IN ('debit', 'credit')),

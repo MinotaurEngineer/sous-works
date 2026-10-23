@@ -3,7 +3,7 @@ import { TransactionInput } from "./transaction.js";
 
 const valid = {
   id: "TXN00001",
-  amount: -87.18,
+  amount: -8718,
   timestamp: "2024-05-16T07:22:18.808Z",
   description: "Municipal Tax Payment",
   type: "debit",
@@ -11,6 +11,26 @@ const valid = {
 };
 
 describe("TransactionInput", () => {
+  it.each([[0], [-8718], [1], [Number.MAX_SAFE_INTEGER], [-Number.MAX_SAFE_INTEGER]])(
+    "accepts an integer amount of cents: %i",
+    (amount) => {
+      expect(TransactionInput.parse({ ...valid, amount }).amount).toBe(amount);
+    },
+  );
+
+  it.each([
+    ["a decimal (87.18 would be read as 87 cents)", 87.18],
+    ["half a cent", 0.5],
+    ["one beyond the safe integer range", Number.MAX_SAFE_INTEGER + 1],
+    ["a numeric string", "8718"],
+    ["null", null],
+  ])("rejects an amount that is %s, saying it must be an integer number of cents", (_name, amount) => {
+    const result = TransactionInput.safeParse({ ...valid, amount });
+    expect(result.success).toBe(false);
+    const messages = result.error?.issues.filter((i) => i.path[0] === "amount").map((i) => i.message);
+    expect(messages).toEqual(["amount must be an integer number of cents (EUR minor units)"]);
+  });
+
   it("accepts a valid transaction and parses the timestamp to a Date", () => {
     const parsed = TransactionInput.parse(valid);
     expect(parsed.timestamp).toBeInstanceOf(Date);
@@ -71,10 +91,10 @@ describe("TransactionInput", () => {
   });
 
   // data/transaction_history.csv: 494 of 1000 rows have a sign that disagrees with the type
-  // (e.g. "Rent Payment", credit, -40.28). Rejecting them would drop half the file.
+  // (e.g. "Rent Payment", credit, -4028 cents). Rejecting them would drop half the file.
   it.each([
-    ["negative credit", { type: "credit", amount: -40.28 }],
-    ["positive debit", { type: "debit", amount: 170.68 }],
+    ["negative credit", { type: "credit", amount: -4028 }],
+    ["positive debit", { type: "debit", amount: 17068 }],
   ])("accepts %s: sign and type are not cross-validated", (_name, override) => {
     expect(TransactionInput.safeParse({ ...valid, ...override }).success).toBe(true);
   });

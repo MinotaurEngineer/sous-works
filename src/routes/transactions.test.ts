@@ -10,7 +10,7 @@ import {
 
 const body = {
   id: "TXN00001",
-  amount: -87.18,
+  amount: -8718,
   timestamp: "2024-05-16T07:22:18.808Z",
   description: "Albert Heijn Purchase",
   type: "debit",
@@ -130,6 +130,15 @@ describe("POST /transactions: input handling", () => {
     const json = (await res.json()) as { error: string; issues: Array<{ path: string; message: string }> };
     expect(json.error).toBe("Invalid transaction");
     expect(json.issues.map((i) => i.path).sort()).toEqual(["amount", "type"]);
+  });
+
+  it("rejects a decimal amount with 400 instead of misreading it as cents", async () => {
+    const res = await post(app, { ...body, amount: -87.18 });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      issues: [{ path: "amount", message: "amount must be an integer number of cents (EUR minor units)" }],
+    });
+    expect(store.size).toBe(0);
   });
 
   it("reads a timestamp without an offset as UTC, like the CSV import", async () => {

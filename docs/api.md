@@ -15,7 +15,7 @@ Base URL `http://localhost:3000`. Requests and responses are JSON unless stated.
 | Field | Type | Notes |
 |---|---|---|
 | `id` | string | Non-empty, unique |
-| `amount` | number | Finite. Sign is not checked against `type` |
+| `amount` | integer | **Cents** (EUR minor units), as Stripe does: `-8718` is -87.18. A decimal such as `-87.18`, a string, or a value beyond ±9007199254740991 is rejected with 400. Sign is not checked against `type` |
 | `timestamp` | string | Output: ISO 8601 in UTC with `Z`. Input: `YYYY-MM-DDTHH:MM:SS[.fff]` followed by an optional `Z` or `±HH:MM` (a space may replace `T`). **No offset means UTC**, the same rule as the CSV import. Offsets are converted to UTC. Other formats and impossible dates (for example 2024-02-30) are rejected with 400 |
 | `description` | string | Non-empty. The only field used for categorisation |
 | `type` | `"debit"` or `"credit"` | |
@@ -38,11 +38,11 @@ Validates the body, categorises it, stores it and returns it. Body max 16 KiB.
 
 ```
 curl -X POST localhost:3000/transactions -H 'Content-Type: application/json' \
-  -d '{"id":"TXN90001","amount":-12.5,"timestamp":"2024-05-16T07:22:18Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686"}'
+  -d '{"id":"TXN90001","amount":-1250,"timestamp":"2024-05-16T07:22:18Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686"}'
 ```
 
 ```
-{"id":"TXN90001","amount":-12.5,"timestamp":"2024-05-16T07:22:18.000Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686","category":"Entertainment"}
+{"id":"TXN90001","amount":-1250,"timestamp":"2024-05-16T07:22:18.000Z","description":"Netflix Subscription","type":"debit","accountNumber":"NLINGB1944573686","category":"Entertainment"}
 ```
 
 (The `category` shown is illustrative; it comes from the model.)
@@ -94,6 +94,7 @@ curl -X POST localhost:3000/transactions/import \
 Required columns (any order, extra columns ignored):
 `Transaction ID, Amount, Timestamp, Description, Transaction Type, Account Number`.
 Timestamps are read as UTC unless they carry an offset (same parser as `POST /transactions`). `Transaction Type` is `debit` or `credit`.
+Here `Amount` is a **decimal in euros** (`-87.18`, `170.7`, `100`), the only place decimals are accepted. The import converts it to integer cents by parsing the text, never by multiplying a float (47 of the 1000 sample amounts, such as `-309.34`, would be off by one cent that way). More than 2 decimals, an exponent, a thousands separator or a value beyond the safe integer range is an invalid row: amounts are never rounded.
 Amount sign and type are not cross-validated: 494 of the 1000 sample rows disagree.
 
 The import is all or nothing: if any row is invalid or any id already exists, nothing is stored. Re-importing the same file returns 409.

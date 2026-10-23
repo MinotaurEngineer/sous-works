@@ -6,7 +6,7 @@ import { DuplicateTransactionError, type TransactionRepository } from "./transac
 
 const txn = (overrides: Partial<Transaction> = {}): Transaction => ({
   id: "TXN00001",
-  amount: -87.18,
+  amount: -8718,
   timestamp: new Date("2024-05-16T07:22:18.808Z"),
   description: "Municipal Tax Payment",
   type: "debit",
@@ -99,6 +99,23 @@ describe("SqliteRepository", () => {
         )
         .run("X", 1, "2024-01-01T00:00:00.000Z", "d", "debit", "acc", "Food"),
     ).toThrow();
+  });
+});
+
+describe("SqliteRepository: amounts are integer cents", () => {
+  it("round-trips the largest safe amount exactly, as an integer", async () => {
+    await repo.save(txn({ amount: Number.MAX_SAFE_INTEGER }));
+    expect((await repo.get("TXN00001"))?.amount).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("round-trips a negative amount and zero", async () => {
+    await repo.saveAll([txn({ id: "A", amount: -1 }), txn({ id: "B", amount: 0 })]);
+    expect((await repo.list()).map((t) => t.amount)).toEqual([-1, 0]);
+  });
+
+  it("the column itself refuses a fractional amount, so a bug upstream cannot store 87.18", async () => {
+    await expect(repo.save(txn({ amount: 87.18 }))).rejects.toThrow();
+    expect(await repo.list()).toEqual([]);
   });
 });
 

@@ -34,6 +34,10 @@ Only the description is used. In the sample data amount sign and `Transaction Ty
 
 Checked by script on `data/transaction_history.csv`: 1000 rows, unique ids, no empty fields, 20 distinct descriptions. Amount sign and type disagree on 494 rows, so they are not cross-validated. CSV timestamps have no timezone and are read as UTC. `POST /transactions` follows the same rule through one shared `parseTimestamp`, which also rejects impossible dates that JavaScript `Date` would silently roll over (Feb 30 becomes Mar 1). Some descriptions are judgment calls for the model, for example "Municipal Tax Payment", "PayPal Transfer", "Tax Refund", "Payment to Credit Card".
 
+## Money
+
+Amounts are integer cents everywhere inside the system and in the JSON API. Integers up to 2^53−1 are exact in JavaScript, so a plain JSON number is safe; `TransactionInput` rejects anything else, and the SQLite column is `INTEGER` (the table is `STRICT`, so a fractional value cannot be stored). The CSV file holds decimal euros, so `parseDecimalToCents` converts the text with `BigInt` and never multiplies a float: `1.15 * 100` is `114.99999999999999`, and 47 of the 1000 sample amounts are hit by that trap. It accepts at most 2 decimals and rejects, never rounds, anything else.
+
 ## Trade-offs
 
 Each: what we chose, what we gave up, when to revisit.
@@ -42,7 +46,7 @@ Each: what we chose, what we gave up, when to revisit.
 |---|---|---|---|
 | 1 | `node:sqlite` (built in) | It is experimental: Node prints an ExperimentalWarning on start. `better-sqlite3` is the alternative but needs a native build | `node:sqlite` is unavailable or unstable. Only `src/repository/sqlite.ts` and `src/db/open.ts` change, because of `TransactionRepository` |
 | 2 | SQLite instead of Postgres: no separate DB container | Single writer; one process owns the file | More than one instance, or concurrent write load |
-| 3 | `amount` stored as REAL | Floating point is unsafe for money; integer cents would be exact | Amounts are summed or compared, or leave this exercise |
+| 3 | `amount` is an integer number of cents (Stripe-style), stored as SQLite `INTEGER`; EUR is assumed and there is no `currency` field | A value with more than 2 decimals, and any non-EUR or zero-decimal currency. The data has no currency column, so a field could not be filled | Multiple currencies appear: add `currency` (ISO 4217) next to `amount`, as Stripe does |
 | 4 | Import is all-or-nothing; re-import returns 409, no upsert | A single bad row or duplicate rejects the whole file | Users need partial import with a per-row report, or idempotent re-import |
 | 5 | `GET /transactions` returns everything, no pagination | Response grows with the table | Table is large enough to hurt latency or memory |
 | 6 | Categorise by description only | Amount and type could disambiguate, but the data is inconsistent | Data is trustworthy, or descriptions are ambiguous per merchant |
@@ -51,7 +55,7 @@ Each: what we chose, what we gave up, when to revisit.
 | 9 | Duplicate id returns 409; upstream categoriser failure returns 502 with the upstream message hidden | Client cannot see why categorisation failed (details go to the server log) | Clients need retry guidance or error codes |
 | 10 | `docker compose` requires `ANTHROPIC_API_KEY` to start, even to read data | Friction for read-only use | Reads and writes need to be split, or a key-less mode is wanted. The upside is a loud failure at start, not at the first write |
 
-Other known gaps: no authentication, no rate limiting, no migrations beyond `CREATE TABLE IF NOT EXISTS`.
+Other known gaps: no authentication, no rate limiting, no migrations beyond `CREATE TABLE IF NOT EXISTS`. Changing the schema (as the move from `REAL` to `INTEGER` amounts did) needs a fresh database file: delete `data/app.db`, or `docker compose down -v` for the Docker volume.
 
 ## Known limitations / not yet verified
 
