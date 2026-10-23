@@ -1,0 +1,10 @@
+1. Groceries
+2. Dining Out
+3. Utilities
+4. Transportation
+5. Entertainment
+6. Healthcare
+7. Shopping
+8. Housing
+9. Education
+10. Miscellaneous
