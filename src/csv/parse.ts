@@ -1,4 +1,5 @@
 import { CsvError, parse } from "csv-parse/sync";
+import { parseTimestamp } from "../domain/timestamp.js";
 import { TransactionInput } from "../domain/transaction.js";
 
 export type CsvIssue = { row: number; message: string };
@@ -23,17 +24,6 @@ const COLUMNS = {
 type Field = keyof typeof COLUMNS;
 
 const AMOUNT = /^-?\d+(\.\d+)?$/;
-const TIMESTAMP = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.(\d+))?$/;
-
-/** CSV timestamps carry no timezone: they are read as UTC. */
-const parseTimestamp = (raw: string): Date | undefined => {
-  const match = TIMESTAMP.exec(raw);
-  if (!match) return undefined;
-  const [, date, time, fraction = ""] = match;
-  const parsed = new Date(`${date}T${time}.${(fraction + "000").slice(0, 3)}Z`);
-  // Date rolls impossible dates over (Feb 30 -> Mar 1); reject them instead.
-  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date ? undefined : parsed;
-};
 
 type CsvRecord = { fields: string[]; row: number };
 
@@ -92,7 +82,7 @@ export const parseTransactionsCsv = (csv: string): TransactionInput[] => {
     }
     const timestamp = parseTimestamp(get("timestamp"));
     if (!timestamp) {
-      fail(`Timestamp must look like YYYY-MM-DD HH:MM:SS[.ffffff], got "${get("timestamp")}"`);
+      fail(`Timestamp must look like YYYY-MM-DD HH:MM:SS[.ffffff] (UTC unless an offset is given), got "${get("timestamp")}"`);
       continue;
     }
     const parsed = TransactionInput.safeParse({

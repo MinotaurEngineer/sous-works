@@ -47,6 +47,29 @@ describe("TransactionInput", () => {
     },
   );
 
+  it.each([
+    ["no offset is UTC", "2024-05-16T07:22:18", "2024-05-16T07:22:18.000Z"],
+    ["an offset is converted to UTC", "2024-05-16T09:22:18+02:00", "2024-05-16T07:22:18.000Z"],
+  ])("timestamp: %s", (_name, timestamp, expected) => {
+    expect(TransactionInput.parse({ ...valid, timestamp }).timestamp.toISOString()).toBe(expected);
+  });
+
+  it.each([["an impossible date", "2024-02-30T00:00:00Z"], ["date only", "2024-05-16"], ["an epoch number", 1715844138000]])(
+    "rejects a timestamp that is: %s",
+    (_name, timestamp) => {
+      expect(TransactionInput.safeParse({ ...valid, timestamp }).success).toBe(false);
+    },
+  );
+
+  it("accepts an already-parsed Date (the CSV parser passes one)", () => {
+    const date = new Date("2024-05-16T07:22:18.808Z");
+    expect(TransactionInput.parse({ ...valid, timestamp: date }).timestamp).toEqual(date);
+  });
+
+  it("rejects an invalid Date", () => {
+    expect(TransactionInput.safeParse({ ...valid, timestamp: new Date("nope") }).success).toBe(false);
+  });
+
   // data/transaction_history.csv: 494 of 1000 rows have a sign that disagrees with the type
   // (e.g. "Rent Payment", credit, -40.28). Rejecting them would drop half the file.
   it.each([

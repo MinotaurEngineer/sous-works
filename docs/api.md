@@ -16,7 +16,7 @@ Base URL `http://localhost:3000`. Requests and responses are JSON unless stated.
 |---|---|---|
 | `id` | string | Non-empty, unique |
 | `amount` | number | Finite. Sign is not checked against `type` |
-| `timestamp` | string | ISO 8601 on output (UTC, `Z`). On input, send an explicit offset such as `Z` |
+| `timestamp` | string | Output: ISO 8601 in UTC with `Z`. Input: `YYYY-MM-DDTHH:MM:SS[.fff]` followed by an optional `Z` or `±HH:MM` (a space may replace `T`). **No offset means UTC**, the same rule as the CSV import. Offsets are converted to UTC. Other formats and impossible dates (for example 2024-02-30) are rejected with 400 |
 | `description` | string | Non-empty. The only field used for categorisation |
 | `type` | `"debit"` or `"credit"` | |
 | `accountNumber` | string | Non-empty |
@@ -93,7 +93,7 @@ curl -X POST localhost:3000/transactions/import \
 
 Required columns (any order, extra columns ignored):
 `Transaction ID, Amount, Timestamp, Description, Transaction Type, Account Number`.
-Timestamps have no timezone and are read as UTC. `Transaction Type` is `debit` or `credit`.
+Timestamps are read as UTC unless they carry an offset (same parser as `POST /transactions`). `Transaction Type` is `debit` or `credit`.
 Amount sign and type are not cross-validated: 494 of the 1000 sample rows disagree.
 
 The import is all or nothing: if any row is invalid or any id already exists, nothing is stored. Re-importing the same file returns 409.

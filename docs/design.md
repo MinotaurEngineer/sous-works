@@ -32,7 +32,7 @@ Only the description is used. In the sample data amount sign and `Transaction Ty
 
 ## Data findings
 
-Checked by script on `data/transaction_history.csv`: 1000 rows, unique ids, no empty fields, 20 distinct descriptions. Amount sign and type disagree on 494 rows, so they are not cross-validated. CSV timestamps have no timezone and are read as UTC. Some descriptions are judgment calls for the model, for example "Municipal Tax Payment", "PayPal Transfer", "Tax Refund", "Payment to Credit Card".
+Checked by script on `data/transaction_history.csv`: 1000 rows, unique ids, no empty fields, 20 distinct descriptions. Amount sign and type disagree on 494 rows, so they are not cross-validated. CSV timestamps have no timezone and are read as UTC. `POST /transactions` follows the same rule through one shared `parseTimestamp`, which also rejects impossible dates that JavaScript `Date` would silently roll over (Feb 30 becomes Mar 1). Some descriptions are judgment calls for the model, for example "Municipal Tax Payment", "PayPal Transfer", "Tax Refund", "Payment to Credit Card".
 
 ## Trade-offs
 
@@ -51,7 +51,7 @@ Each: what we chose, what we gave up, when to revisit.
 | 9 | Duplicate id returns 409; upstream categoriser failure returns 502 with the upstream message hidden | Client cannot see why categorisation failed (details go to the server log) | Clients need retry guidance or error codes |
 | 10 | `docker compose` requires `ANTHROPIC_API_KEY` to start, even to read data | Friction for read-only use | Reads and writes need to be split, or a key-less mode is wanted. The upside is a loud failure at start, not at the first write |
 
-Other known gaps: no authentication, no rate limiting, no migrations beyond `CREATE TABLE IF NOT EXISTS`, and `POST /transactions` parses a timestamp without a timezone using JavaScript `Date` rules (assumption: send an explicit offset), unlike the CSV import, which reads it as UTC.
+Other known gaps: no authentication, no rate limiting, no migrations beyond `CREATE TABLE IF NOT EXISTS`.
 
 ## Known limitations / not yet verified
 

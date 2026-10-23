@@ -132,6 +132,16 @@ describe("POST /transactions: input handling", () => {
     expect(json.issues.map((i) => i.path).sort()).toEqual(["amount", "type"]);
   });
 
+  it("reads a timestamp without an offset as UTC, like the CSV import", async () => {
+    const res = await post(app, { ...body, timestamp: "2024-05-16T07:22:18" });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { timestamp: string }).timestamp).toBe("2024-05-16T07:22:18.000Z");
+  });
+
+  it("rejects an impossible date with 400", async () => {
+    expect((await post(app, { ...body, timestamp: "2024-02-30T00:00:00Z" })).status).toBe(400);
+  });
+
   it("explains a missing timestamp instead of a type-system message", async () => {
     const { timestamp: _omitted, ...withoutTimestamp } = body;
     const res = await post(app, withoutTimestamp);
