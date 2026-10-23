@@ -1,0 +1,15 @@
+import { z } from "zod";
+import type { Category } from "./categories.js";
+
+/** Input contract for POST /transactions and for each CSV row. */
+export const TransactionInput = z.object({
+  id: z.string().min(1),
+  amount: z.number().finite(),
+  timestamp: z.coerce.date(),
+  description: z.string().min(1),
+  type: z.enum(["debit", "credit"]),
+  accountNumber: z.string().min(1),
+});
+export type TransactionInput = z.infer<typeof TransactionInput>;
+
+export type Transaction = TransactionInput & { category: Category };
