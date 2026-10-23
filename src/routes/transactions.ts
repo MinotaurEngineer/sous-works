@@ -7,9 +7,9 @@ export type Deps = {
   repository: TransactionRepository;
 };
 
-// TODO: validate with TransactionInput, categorise, persist.
-export const transactionRoutes = (_deps: Deps) =>
+// TODO: POST (validate, categorise, persist) and GET /:id.
+export const transactionRoutes = ({ repository }: Deps) =>
   new Hono()
     .post("/", (c) => c.json({ error: "not implemented" }, 501))
-    .get("/", (c) => c.json({ error: "not implemented" }, 501))
+    .get("/", async (c) => c.json(await repository.list()))
     .get("/:id", (c) => c.json({ error: "not implemented" }, 501));

@@ -44,6 +44,26 @@ describe("SqliteRepository", () => {
     expect(ids).toEqual(["A", "B"]);
   });
 
+  it("lists transactions with every field mapped back to the domain shape", async () => {
+    await repo.save(txn());
+    expect(await repo.list()).toEqual([txn()]);
+  });
+
+  it("lists in timestamp order, then id, regardless of insertion order", async () => {
+    await repo.save(txn({ id: "C", timestamp: new Date("2024-02-01T00:00:00.000Z") }));
+    await repo.save(txn({ id: "B", timestamp: new Date("2024-01-01T00:00:00.000Z") }));
+    await repo.save(txn({ id: "A", timestamp: new Date("2024-01-01T00:00:00.000Z") }));
+    expect((await repo.list()).map((t) => t.id)).toEqual(["A", "B", "C"]);
+  });
+
+  it("list fails loudly on a stored row with an invalid category", async () => {
+    db.exec("PRAGMA ignore_check_constraints = ON");
+    db.prepare("INSERT INTO transactions VALUES (?,?,?,?,?,?,?)").run(
+      "BAD", 1, "2024-01-01T00:00:00.000Z", "d", "debit", "a", "Food",
+    );
+    await expect(repo.list()).rejects.toThrow(/BAD.*Food/);
+  });
+
   it("rejects a duplicate id rather than overwriting", async () => {
     await repo.save(txn());
     await expect(repo.save(txn({ category: "Groceries" }))).rejects.toThrow();

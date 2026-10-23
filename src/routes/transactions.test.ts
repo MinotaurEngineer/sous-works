@@ -20,6 +20,14 @@ const post = (app: ReturnType<typeof createApp>, payload: unknown) =>
     body: typeof payload === "string" ? payload : JSON.stringify(payload),
   });
 
+const stored = (overrides: Partial<Transaction> = {}): Transaction => ({
+  ...body,
+  timestamp: new Date(body.timestamp),
+  type: "debit",
+  category: "Groceries",
+  ...overrides,
+});
+
 let store: Map<string, Transaction>;
 let repository: TransactionRepository;
 let categorise: ReturnType<typeof vi.fn<Categoriser["categorise"]>>;
@@ -94,12 +102,34 @@ describe("GET /transactions", () => {
   });
 
   it("returns all categorised transactions", async () => {
-    await post(app, body);
-    await post(app, { ...body, id: "TXN00002" });
+    await repository.save(stored({ id: "TXN00001" }));
+    await repository.save(stored({ id: "TXN00002", category: "Housing" }));
     const res = await app.request("/transactions");
+    expect(res.status).toBe(200);
     const list = (await res.json()) as Array<{ id: string; category: string }>;
-    expect(list.map((t) => t.id).sort()).toEqual(["TXN00001", "TXN00002"]);
-    expect(list.every((t) => t.category === "Groceries")).toBe(true);
+    expect(list.map((t) => [t.id, t.category])).toEqual([
+      ["TXN00001", "Groceries"],
+      ["TXN00002", "Housing"],
+    ]);
+  });
+
+  it("serialises each transaction in the API shape, timestamp as ISO 8601", async () => {
+    await repository.save(stored());
+    const res = await app.request("/transactions");
+    expect(await res.json()).toEqual([{ ...body, category: "Groceries" }]);
+  });
+
+  it("does not call the categoriser", async () => {
+    await repository.save(stored());
+    await app.request("/transactions");
+    expect(categorise).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when the repository fails", async () => {
+    repository.list = async () => {
+      throw new Error("db down");
+    };
+    expect((await app.request("/transactions")).status).toBe(500);
   });
 });
 
