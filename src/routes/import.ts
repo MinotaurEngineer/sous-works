@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { summariseError } from "../errors.js";
 import { CategorisationError, categoriseTransactions } from "../categoriser/categorise.js";
 import { CsvParseError, parseTransactionsCsv } from "../csv/parse.js";
 import { DuplicateTransactionError } from "../repository/transactionRepository.js";
@@ -31,7 +32,7 @@ export const importRoutes = ({ categoriser, repository }: Deps) =>
         await repository.saveAll(await categoriseTransactions(categoriser, inputs));
       } catch (e) {
         if (e instanceof CategorisationError) {
-          console.error(e);
+          console.error(summariseError(e));
           return c.json({ error: "Categorisation failed" }, 502);
         }
         if (e instanceof DuplicateTransactionError) {

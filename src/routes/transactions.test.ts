@@ -94,6 +94,28 @@ describe("POST /transactions", () => {
     expect(store.size).toBe(0);
   });
 
+  it("logs a categoriser failure as one line, without headers or ids", async () => {
+    const upstream = Object.assign(new Error("400 credit balance too low"), {
+      status: 400,
+      requestID: "req_9",
+      headers: { "anthropic-organization-id": "org-secret-id" },
+    });
+    categorise.mockRejectedValueOnce(upstream);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await post(app, body);
+      expect(log).toHaveBeenCalledOnce();
+      const [line, ...rest] = log.mock.calls[0]!;
+      expect(rest).toEqual([]);
+      expect(typeof line).toBe("string");
+      expect(line).toContain("credit balance too low");
+      expect(line).toContain("req_9");
+      expect(line).not.toContain("org-secret-id");
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("does not leak the upstream error message to the client", async () => {
     categorise.mockRejectedValueOnce(new Error("sk-secret-key rejected"));
     const res = await post(app, body);

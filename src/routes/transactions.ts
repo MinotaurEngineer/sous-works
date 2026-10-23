@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { summariseError } from "../errors.js";
 import { CategorisationError, categoriseTransactions } from "../categoriser/categorise.js";
 import type { Categoriser } from "../categoriser/categoriser.js";
 import { TransactionInput } from "../domain/transaction.js";
@@ -36,7 +37,7 @@ export const transactionRoutes = ({ categoriser, repository }: Deps) =>
           return c.json(transaction, 201);
         } catch (e) {
           if (e instanceof CategorisationError) {
-            console.error(e);
+            console.error(summariseError(e));
             return c.json({ error: "Categorisation failed" }, 502);
           }
           if (e instanceof DuplicateTransactionError) {
