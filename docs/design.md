@@ -57,4 +57,4 @@ Other known gaps: no authentication, no rate limiting, no migrations beyond `CRE
 
 - The real Anthropic API has not been called (no key was available). Categorisation accuracy, the prompt's behaviour on the 20 sample descriptions, and the model id default are unverified. No accuracy figures are claimed. The categoriser is tested only against a fake model call.
 - `docker compose up` has not been run end to end (Compose is not installed on the author's machine). The image was built and run with plain `docker build` and `docker run`.
-- Test count (176 across 12 files) is stated; no coverage percentage was measured.
+- No coverage percentage was measured; run `npm test` for the current pass/fail result.

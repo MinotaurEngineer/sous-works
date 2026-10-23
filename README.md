@@ -67,11 +67,11 @@ Layout:
 | `src/routes`, `src/app.ts` | HTTP routes and app wiring |
 | `prompts/categorise.md` | Runtime prompt, the single source |
 
-Tests: 176 tests in 12 files covering domain validation, CSV parsing, normalisation, the categorise step, the Anthropic categoriser (batching, cache, retry, with a fake model call), the SQLite repository, each route, and an end-to-end import. They use a fake `Categoriser` or fake model call, so no test contacts the Anthropic API.
+Tests (`npm test`) cover config loading, domain validation and timestamp parsing, CSV parsing, normalisation, the categorise step, the Anthropic categoriser (batching, cache, retry, with a fake model call), the SQLite repository, each route, and an end-to-end import. They use a fake `Categoriser` or fake model call, so no test contacts the Anthropic API.
 
 ## Verification status
 
-- Unit and integration tests: all 176 pass at the time of writing.
+- Unit and integration tests: all pass (`npm test`).
 - Docker: the image was built and run with plain `docker build` and `docker run`. `docker compose up` has not been run end to end, because Compose is not installed on the author's machine. `docker-compose.yml` is therefore untested.
 - The real Anthropic API has not been called (no key was available), so categorisation accuracy is unverified. See "Known limitations" in [docs/design.md](docs/design.md).
 
