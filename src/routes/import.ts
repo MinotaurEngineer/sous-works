@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { CategorisationError, categoriseTransactions } from "../categoriser/categorise.js";
 import { CsvParseError, parseTransactionsCsv } from "../csv/parse.js";
 import { DuplicateTransactionError } from "../repository/transactionRepository.js";
 import type { Deps } from "./transactions.js";
@@ -26,21 +27,13 @@ export const importRoutes = ({ categoriser, repository }: Deps) =>
       }
       if (inputs.length === 0) return c.json({ error: "CSV contains no transactions" }, 400);
 
-      let categories;
       try {
-        categories = await categoriser.categorise(inputs);
+        await repository.saveAll(await categoriseTransactions(categoriser, inputs));
       } catch (e) {
-        console.error("categoriser failed", e);
-        return c.json({ error: "Categorisation failed" }, 502);
-      }
-      if (categories.length !== inputs.length) {
-        console.error(`categoriser returned ${categories.length} categories for ${inputs.length} transactions`);
-        return c.json({ error: "Categorisation failed" }, 502);
-      }
-
-      try {
-        await repository.saveAll(inputs.map((t, i) => ({ ...t, category: categories[i]! })));
-      } catch (e) {
+        if (e instanceof CategorisationError) {
+          console.error(e);
+          return c.json({ error: "Categorisation failed" }, 502);
+        }
         if (e instanceof DuplicateTransactionError) {
           return c.json({ error: "One or more transaction ids already exist" }, 409);
         }

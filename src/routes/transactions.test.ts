@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
+import { MAX_TRANSACTION_BYTES } from "./transactions.js";
 import type { Categoriser } from "../categoriser/categoriser.js";
 import type { Transaction } from "../domain/transaction.js";
 import {
@@ -97,6 +98,50 @@ describe("POST /transactions", () => {
     categorise.mockRejectedValueOnce(new Error("sk-secret-key rejected"));
     const res = await post(app, body);
     expect(await res.text()).not.toContain("sk-secret-key");
+  });
+});
+
+describe("POST /transactions: input handling", () => {
+  it("names each invalid field in a 400 body", async () => {
+    const res = await post(app, { ...body, type: "refund", amount: "x" });
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string; issues: Array<{ path: string; message: string }> };
+    expect(json.error).toBe("Invalid transaction");
+    expect(json.issues.map((i) => i.path).sort()).toEqual(["amount", "type"]);
+  });
+
+  it("ignores a client-supplied category: only the categoriser decides", async () => {
+    const res = await post(app, { ...body, category: "Housing" });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { category: string }).category).toBe("Groceries");
+    expect(categorise.mock.calls[0]?.[0][0]).not.toHaveProperty("category");
+  });
+
+  it.each([["an array", []], ["null", null], ["a string", "hello"], ["an empty object", {}]])(
+    "returns 400 when the JSON body is %s",
+    async (_name, payload) => {
+      expect((await post(app, JSON.stringify(payload))).status).toBe(400);
+      expect(categorise).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns 413 when the body exceeds MAX_TRANSACTION_BYTES", async () => {
+    const res = await post(app, { ...body, description: "x".repeat(MAX_TRANSACTION_BYTES) });
+    expect(res.status).toBe(413);
+    expect(categorise).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 and stores nothing when the categoriser breaks its contract (wrong count)", async () => {
+    categorise.mockResolvedValueOnce(["Groceries", "Housing"]);
+    expect((await post(app, body)).status).toBe(502);
+    expect(store.size).toBe(0);
+  });
+
+  it("returns 500 when the repository fails for a reason other than a duplicate", async () => {
+    repository.save = async () => {
+      throw new Error("db down");
+    };
+    expect((await post(app, body)).status).toBe(500);
   });
 });
 
