@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { isCategory } from "../domain/categories.js";
 import type { Transaction } from "../domain/transaction.js";
-import type { TransactionRepository } from "./transactionRepository.js";
+import { DuplicateTransactionError, type TransactionRepository } from "./transactionRepository.js";
 
 type Row = {
   id: string;
@@ -12,6 +12,9 @@ type Row = {
   account_number: string;
   category: string;
 };
+
+// node:sqlite reports a primary-key violation as errcode 1555 (SQLITE_CONSTRAINT_PRIMARYKEY).
+const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
 
 const toTransaction = (row: Row): Transaction => {
   if (!isCategory(row.category)) {
@@ -36,9 +39,30 @@ export const createSqliteRepository = (db: DatabaseSync): TransactionRepository 
   const selectOne = db.prepare("SELECT * FROM transactions WHERE id = ?");
   const selectAll = db.prepare("SELECT * FROM transactions ORDER BY timestamp, id");
 
+  const insertOne = (t: Transaction) => {
+    try {
+      insert.run(t.id, t.amount, t.timestamp.toISOString(), t.description, t.type, t.accountNumber, t.category);
+    } catch (e) {
+      if ((e as { errcode?: number }).errcode === SQLITE_CONSTRAINT_PRIMARYKEY) {
+        throw new DuplicateTransactionError();
+      }
+      throw e;
+    }
+  };
+
   return {
     async save(t) {
-      insert.run(t.id, t.amount, t.timestamp.toISOString(), t.description, t.type, t.accountNumber, t.category);
+      insertOne(t);
+    },
+    async saveAll(ts) {
+      db.exec("BEGIN");
+      try {
+        ts.forEach(insertOne);
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
     },
     async list() {
       return (selectAll.all() as Row[]).map(toTransaction);

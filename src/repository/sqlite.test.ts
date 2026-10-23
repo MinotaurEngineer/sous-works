@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../db/open.js";
 import type { Transaction } from "../domain/transaction.js";
 import { createSqliteRepository } from "./sqlite.js";
-import type { TransactionRepository } from "./transactionRepository.js";
+import { DuplicateTransactionError, type TransactionRepository } from "./transactionRepository.js";
 
 const txn = (overrides: Partial<Transaction> = {}): Transaction => ({
   id: "TXN00001",
@@ -101,3 +101,50 @@ describe("SqliteRepository", () => {
     ).toThrow();
   });
 });
+
+describe("SqliteRepository: duplicates and saveAll", () => {
+  it("save throws DuplicateTransactionError for an existing id", async () => {
+    await repo.save(txn());
+    await expect(repo.save(txn())).rejects.toBeInstanceOf(DuplicateTransactionError);
+  });
+
+  it("saveAll stores every transaction", async () => {
+    await repo.saveAll([txn({ id: "A" }), txn({ id: "B" }), txn({ id: "C" })]);
+    expect((await repo.list()).map((t) => t.id)).toEqual(["A", "B", "C"]);
+  });
+
+  it("saveAll with no transactions is a no-op", async () => {
+    await repo.saveAll([]);
+    expect(await repo.list()).toEqual([]);
+  });
+
+  it("saveAll is atomic: an id already stored rejects the whole batch", async () => {
+    await repo.save(txn({ id: "B" }));
+    await expect(repo.saveAll([txn({ id: "A" }), txn({ id: "B" }), txn({ id: "C" })])).rejects.toBeInstanceOf(
+      DuplicateTransactionError,
+    );
+    expect((await repo.list()).map((t) => t.id)).toEqual(["B"]);
+  });
+
+  it("saveAll is atomic: an id repeated inside the batch rejects the whole batch", async () => {
+    await expect(repo.saveAll([txn({ id: "A" }), txn({ id: "A" })])).rejects.toBeInstanceOf(
+      DuplicateTransactionError,
+    );
+    expect(await repo.list()).toEqual([]);
+  });
+
+  it("saveAll rolls back on a non-duplicate failure and rethrows it unchanged", async () => {
+    const bad = txn({ id: "B", category: "Food" as never });
+    const failure = await repo.saveAll([txn({ id: "A" }), bad]).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(DuplicateTransactionError);
+    expect(await repo.list()).toEqual([]);
+  });
+
+  it("stays usable after a failed saveAll (the transaction was closed)", async () => {
+    await repo.saveAll([txn({ id: "A" }), txn({ id: "A" })]).catch(() => {});
+    await repo.saveAll([txn({ id: "A" })]);
+    expect(await repo.list()).toHaveLength(1);
+  });
+});
+
