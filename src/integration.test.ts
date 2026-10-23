@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { createAnthropicCategoriser, type Complete } from "./categoriser/anthropic.js";
 import type { Categoriser } from "./categoriser/categoriser.js";
@@ -87,6 +87,12 @@ describe("CSV intake, end to end", () => {
 });
 
 describe("CSV intake with the real categoriser (model faked)", () => {
+  beforeEach(() => {
+    // Failure-path tests make the app log on purpose; keep a passing run free of fake errors.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
   it("imports 1000 rows with one model call carrying only the 20 distinct descriptions", async () => {
     const complete = vi.fn<Complete>(async (_system, user) => {
       const descriptions: string[] = JSON.parse(user.split("\n")[1]!);

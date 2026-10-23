@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import type { Categoriser } from "../categoriser/categoriser.js";
 import { MAX_CSV_BYTES } from "./import.js";
@@ -22,6 +22,8 @@ let categorise: ReturnType<typeof vi.fn<Categoriser["categorise"]>>;
 let app: ReturnType<typeof createApp>;
 
 beforeEach(() => {
+  // Failure-path tests make the app log on purpose; keep a passing run free of fake errors.
+  vi.spyOn(console, "error").mockImplementation(() => {});
   saved = [];
   repository = {
     save: async () => {},
@@ -34,6 +36,8 @@ beforeEach(() => {
   categorise = vi.fn<Categoriser["categorise"]>(async (ts) => ts.map(() => "Groceries"));
   app = createApp({ categoriser: { categorise }, repository });
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("POST /transactions/import", () => {
   it("categorises and stores every row, returning 201 with the count", async () => {
