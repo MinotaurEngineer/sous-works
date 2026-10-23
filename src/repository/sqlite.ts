@@ -33,6 +33,7 @@ export const createSqliteRepository = (db: DatabaseSync): TransactionRepository 
     `INSERT INTO transactions (id, amount, timestamp, description, type, account_number, category)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
+  const selectOne = db.prepare("SELECT * FROM transactions WHERE id = ?");
   const selectAll = db.prepare("SELECT * FROM transactions ORDER BY timestamp, id");
 
   return {
@@ -42,8 +43,9 @@ export const createSqliteRepository = (db: DatabaseSync): TransactionRepository 
     async list() {
       return (selectAll.all() as Row[]).map(toTransaction);
     },
-    async get() {
-      throw new Error("SqliteRepository.get not implemented");
+    async get(id) {
+      const row = selectOne.get(id) as Row | undefined;
+      return row && toTransaction(row);
     },
   };
 };

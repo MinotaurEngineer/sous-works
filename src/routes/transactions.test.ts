@@ -135,13 +135,42 @@ describe("GET /transactions", () => {
 
 describe("GET /transactions/:id", () => {
   it("returns the transaction", async () => {
-    await post(app, body);
+    await repository.save(stored());
     const res = await app.request("/transactions/TXN00001");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ...body, category: "Groceries" });
   });
 
-  it("returns 404 for an unknown id", async () => {
-    expect((await app.request("/transactions/nope")).status).toBe(404);
+  it("returns only the requested transaction", async () => {
+    await repository.save(stored({ id: "TXN00001" }));
+    await repository.save(stored({ id: "TXN00002", category: "Housing" }));
+    const res = await app.request("/transactions/TXN00002");
+    expect(await res.json()).toMatchObject({ id: "TXN00002", category: "Housing" });
+  });
+
+  it("returns 404 with a JSON error for an unknown id", async () => {
+    const res = await app.request("/transactions/nope");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Transaction not found" });
+  });
+
+  it("decodes a percent-encoded id before lookup", async () => {
+    await repository.save(stored({ id: "a b/c" }));
+    const res = await app.request(`/transactions/${encodeURIComponent("a b/c")}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "a b/c" });
+  });
+
+  it("does not call the categoriser", async () => {
+    await repository.save(stored());
+    await app.request("/transactions/TXN00001");
+    expect(categorise).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when the repository fails", async () => {
+    repository.get = async () => {
+      throw new Error("db down");
+    };
+    expect((await app.request("/transactions/TXN00001")).status).toBe(500);
   });
 });

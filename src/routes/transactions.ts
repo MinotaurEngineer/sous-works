@@ -7,9 +7,12 @@ export type Deps = {
   repository: TransactionRepository;
 };
 
-// TODO: POST (validate, categorise, persist) and GET /:id.
+// TODO: POST (validate, categorise, persist).
 export const transactionRoutes = ({ repository }: Deps) =>
   new Hono()
     .post("/", (c) => c.json({ error: "not implemented" }, 501))
     .get("/", async (c) => c.json(await repository.list()))
-    .get("/:id", (c) => c.json({ error: "not implemented" }, 501));
+    .get("/:id", async (c) => {
+      const transaction = await repository.get(c.req.param("id"));
+      return transaction ? c.json(transaction) : c.json({ error: "Transaction not found" }, 404);
+    });

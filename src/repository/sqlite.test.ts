@@ -33,6 +33,20 @@ describe("SqliteRepository", () => {
     expect(await repo.get("nope")).toBeUndefined();
   });
 
+  it("get returns only the matching row", async () => {
+    await repo.save(txn({ id: "A" }));
+    await repo.save(txn({ id: "B", category: "Groceries" }));
+    expect((await repo.get("B"))?.category).toBe("Groceries");
+  });
+
+  it("get fails loudly on a stored row with an invalid category", async () => {
+    db.exec("PRAGMA ignore_check_constraints = ON");
+    db.prepare("INSERT INTO transactions VALUES (?,?,?,?,?,?,?)").run(
+      "BAD", 1, "2024-01-01T00:00:00.000Z", "d", "debit", "a", "Food",
+    );
+    await expect(repo.get("BAD")).rejects.toThrow(/BAD.*Food/);
+  });
+
   it("lists nothing when empty", async () => {
     expect(await repo.list()).toEqual([]);
   });
