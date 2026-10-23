@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../app.js";
 import type { Categoriser } from "../categoriser/categoriser.js";
 import type { Transaction } from "../domain/transaction.js";
-import type { TransactionRepository } from "../repository/transactionRepository.js";
+import {
+  DuplicateTransactionError,
+  type TransactionRepository,
+} from "../repository/transactionRepository.js";
 
 const body = {
   id: "TXN00001",
@@ -37,8 +40,11 @@ beforeEach(() => {
   store = new Map();
   repository = {
     save: async (t) => {
-      if (store.has(t.id)) throw new Error("duplicate");
+      if (store.has(t.id)) throw new DuplicateTransactionError();
       store.set(t.id, t);
+    },
+    saveAll: async (ts) => {
+      for (const t of ts) await repository.save(t);
     },
     list: async () => [...store.values()],
     get: async (id) => store.get(id),

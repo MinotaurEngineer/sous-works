@@ -4,7 +4,7 @@ import { CATEGORIES } from "./domain/categories.js";
 
 const app = createApp({
   categoriser: { categorise: async (t) => t.map(() => "Miscellaneous") },
-  repository: { save: async () => {}, list: async () => [], get: async () => undefined },
+  repository: { save: async () => {}, saveAll: async () => {}, list: async () => [], get: async () => undefined },
 });
 
 describe("app", () => {
